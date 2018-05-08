@@ -58,6 +58,21 @@ abstract class BaseFile extends BaseObject
      */
     private $_urlManager = 'urlManager';
 
+	/**
+     * @var bool to identify if its a news or not
+     */
+    protected $isNews = false;
+
+    /**
+     * @var bool to identify if its images or not
+     */
+    protected $hasImages = false;
+
+    /**
+     * @var bool to identify if its video or not
+     */
+    protected $hasVideos = false;
+
 
     /**
      * Destructor.
@@ -90,7 +105,7 @@ abstract class BaseFile extends BaseObject
     public function getUrlManager()
     {
         if (!is_object($this->_urlManager)) {
-            $this->_urlManager = Instance::ensure($this->_urlManager, UrlManager::className());
+            $this->_urlManager = Instance::ensure($this->_urlManager, UrlManager::class);
         }
         return $this->_urlManager;
     }
@@ -195,6 +210,18 @@ abstract class BaseFile extends BaseObject
             throw new Exception('Unable to write file "' . $this->getFullFileName() . '".');
         }
         return $bytesWritten;
+    }
+
+	/**
+     * Entity escaping.
+     * @param $string
+     * @return string
+     */
+    public function entityEscaping($string)
+    {
+        $character = array("&", "'", "\"", ">", "<");
+        $escapeCode = array("&amp;", "&apos;", "&quot;", "&gt;", "&lt;");
+        return str_replace($character, $escapeCode, $string);
     }
 
     /**

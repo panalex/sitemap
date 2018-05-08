@@ -48,6 +48,7 @@ class File extends BaseFile
      */
     public $defaultOptions = [];
 
+	protected $schema = [];
 
     /**
      * {@inheritdoc}
@@ -55,7 +56,10 @@ class File extends BaseFile
     protected function afterOpen()
     {
         parent::afterOpen();
-        $this->write('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
+        $namespaces = ($this->isNews) ? ' xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"' : '';
+        $namespaces .= ($this->hasImages) ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : '';
+        $namespaces .= ($this->hasVideos) ? ' xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"' : '';
+        $this->write('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml"'.$namespaces.'>');
     }
 
     /**
@@ -115,7 +119,69 @@ class File extends BaseFile
         $xmlCode .= "<changefreq>{$options['changeFrequency']}</changefreq>";
         $xmlCode .= "<priority>{$options['priority']}</priority>";
 
-        $xmlCode .= '</url>';
+        if(isset($options['news']))
+        {
+            $this->isNews = true;
+            $xmlCode .= '<news:news>';
+            $xmlCode .= '<news:publication>';
+            $xmlCode .= '<news:name>' . $options['news']['name'] . '</news:name>';
+            $xmlCode .= '<news:language>' . $options['news']['language'] .'</news:language>';
+            $xmlCode .= '</news:publication>';
+            $xmlCode .= '<news:genres>' . $options['news']['genres'] .'</news:genres>';
+            $xmlCode .= '<news:publication_date>' .  $options['news']['publicationDate']  . '</news:publication_date>';
+            $xmlCode .= '<news:title><![CDATA[' . trim($options['news']['title']) . ']]></news:title>';
+            $xmlCode .= '<news:keywords><![CDATA[' . trim($options['news']['keywords']) . ']]></news:keywords>';
+            $xmlCode .= '</news:news>';
+        }
+        if(isset($options['images']) && is_array($options['images']) && count($options['images']) > 0)
+        {
+            $this->hasImages = true;
+            foreach($options['images'] as $image) {
+                $xmlCode .= '<image:image>';
+                if(isset($image['location']))   $xmlCode .= '   <image:loc><![CDATA[' . $image['location'] . ']]></image:loc>';
+                if(isset($image['caption']))   $xmlCode .= '   <image:caption><![CDATA[' . $image['caption'] . ']]></image:caption>';
+                if(isset($image['geoLocation']))   $xmlCode .= '   <image:geo_location>' . $image['geoLocation'] . '</image:geo_location>';
+                if(isset($image['title']))   $xmlCode .= '   <image:title><![CDATA[' . $image['title'] . ']]></image:title>';
+                if(isset($image['license']))   $xmlCode .= '   <image:license><![CDATA[' . $image['license'] . ']]></image:license>';
+                $xmlCode .= '</image:image>';
+            }
+        }
+        if(isset($options['video']) && is_array($options['video']) && count($options['video']) > 0)
+        {
+            $this->hasVideos = true;
+            $types = ['duration','expiration_date', 'rating', 'view_count', 'publication_date', 'family_friendly', 'tag', 'category', 'restriction',
+                'gallery_loc', 'price', 'requires_subscription', 'uploader', 'platform', 'live', ];
+            foreach($options['video'] as $video) {
+                $xmlCode .= '<video:video>';
+                $xmlCode .= '   <video:thumbnail_loc><![CDATA[' . $video['thumbnail_loc'] . ']]></video:thumbnail_loc>';
+                $xmlCode .= '   <video:title><![CDATA[' . $video['title'] . ']]></video:title>';
+                $xmlCode .= '   <video:description><![CDATA[' . $video['description'] . ']]></video:description>';
+                if(!isset($video['player_loc']))   $xmlCode .= '   <video:content_loc><![CDATA[' . $video['content_loc'] . ']]></video:content_loc>';
+                elseif(!isset($video['content_loc']))   $xmlCode .= '   <video:player_loc><![CDATA[' . $video['player_loc'] . ']]></video:player_loc>';
+                foreach ($types as $type) {
+                    if(isset($video[$type]))   $xmlCode .= '   <video:' .$type. '><![CDATA[' . $video[$type] . ']]></video:' .$type. '>';
+                }
+                $xmlCode .= '</video:video>';
+            }
+        }
+        if(isset($options['alternate']))
+        {
+            if (isset($options['alternate']['url'])) $options['alternate'] = [$options['alternate']];
+            $options['alternate'] = (array)$options['alternate'];
+            foreach ($options['alternate'] as $alternate) {
+                $xmlCode .= '<xhtml:link rel="alternate"';
+                if (isset($alternate['url'])) {
+                    $xmlCode .= ' href="'.$alternate['url'].'"';
+                    unset($alternate['url']);
+                }
+                foreach ($alternate as $key => $val) {
+                    $xmlCode .= ' '.$key.'="'.$val.'"';
+                }
+                $xmlCode .= '/>';
+            }
+        }
+
+        $xmlCode .= '</url>'.PHP_EOL;
         return $this->write($xmlCode);
     }
 }

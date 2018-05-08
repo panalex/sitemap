@@ -44,6 +44,13 @@ class IndexFile extends BaseFile
      * @var string name of the site map file.
      */
     public $fileName = 'sitemap_index.xml';
+
+	/**
+     * @var string directory, which should be used to store generated site map index file.
+     * By default '@app/web/sitemap' will be used.
+     */
+    public $indexBasePath = '@app/web/sitemap';
+
     /**
      * @var string base URL for the directory, which contains the site map files.
      */
@@ -78,6 +85,15 @@ class IndexFile extends BaseFile
     {
         $urlManager = $this->getUrlManager();
         return $urlManager->getHostInfo() . $urlManager->getBaseUrl() . '/sitemap';
+    }
+
+	/**
+     * Returns the full file name.
+     * @return string full file name.
+     */
+    public function getFullFileName()
+    {
+        return Yii::getAlias($this->indexBasePath) . DIRECTORY_SEPARATOR . $this->fileName;
     }
 
     /**
@@ -130,10 +146,23 @@ class IndexFile extends BaseFile
     {
         $path = Yii::getAlias($path);
 
+        // Compressed files
         $findOptions = [
             'only' => [
-                '*.xml',
-                '*.gzip'
+                '*.gz'
+            ],
+        ];
+
+        $filesGz = FileHelper::findFiles($path, $findOptions);
+        $fileXml = [];
+        foreach ($filesGz as $fileGz) {
+            $fileXml[$fileGz] =  $fileGz;
+        }
+
+        // xml files
+        $findOptions = [
+            'only' => [
+                '*.xml'
             ],
         ];
         $files = FileHelper::findFiles($path, $findOptions);
@@ -147,6 +176,24 @@ class IndexFile extends BaseFile
             if ($file === $indexFileName) {
                 continue;
             }
+
+            // compress files
+            file_put_contents($file.'.gz', gzencode(file_get_contents($file), 9));
+            $fileSize = filesize($file.'.gz');
+            if ($fileSize > self::MAX_FILE_SIZE) {
+                throw new Exception('File "'.$file.'.gz'.'" has exceed the size limit of "'.self::MAX_FILE_SIZE.'": actual file size: "'.$fileSize.'".');
+            }
+            unlink($file);
+            $file = $file.'.gz';
+
+            if(isset($fileXml[$file]))  unset($fileXml[$file]);
+
+            $fileUrl = $fileBaseUrl . '/' . basename($file);
+            $lastModifiedDate = date('Y-m-d', filemtime($file));
+            $this->writeSiteMap($fileUrl, $lastModifiedDate);
+            $siteMapsCount++;
+        }
+        foreach ($fileXml as $file) {
             $fileUrl = $fileBaseUrl . '/' . basename($file);
             $lastModifiedDate = date('Y-m-d', filemtime($file));
             $this->writeSiteMap($fileUrl, $lastModifiedDate);
